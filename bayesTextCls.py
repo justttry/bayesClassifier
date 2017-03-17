@@ -5,6 +5,7 @@ import unittest
 from sklearn.feature_selection import chi2, SelectKBest
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.feature_extraction import DictVectorizer
+from sklearn.feature_selection import mutual_info_classif 
 import jieba
 import csv
 import os
@@ -13,6 +14,7 @@ import sys
 import shelve
 import nltk
 import random
+from decisionTree import calcInformationGain, calcShannonEnt
 
 csv.field_size_limit(sys.maxint)
 
@@ -80,7 +82,7 @@ def load_file(files, filetype='csv'):
     return X, y, v.get_feature_names()
 
 #----------------------------------------------------------------------
-def select_features(dirs, nums=1000, filetype='csv'):
+def select_features_chi(dirs, nums=1000, filetype='csv'):
     """
     使用卡方检验选取特征值
     """
@@ -97,6 +99,60 @@ def select_features(dirs, nums=1000, filetype='csv'):
     columns = [i for (i, _) in sortedlist]
     return X[:, columns[:nums]], y, \
            [labels[int(i)] for i in np.array(sortedlist[:nums])[:, 0]]
+
+#----------------------------------------------------------------------
+def select_features_ig(dirs, nums=1000, filetype='csv'):
+    """
+    使用信息增益选取特征值
+    """
+    cwd = os.getcwd()
+    cwd = cwd + '\\' + dirs
+    files = get_test_files(cwd)
+    X, y, labels = load_file(files, filetype)
+    m, n = np.shape(X)
+    #计算信息熵增益
+    newX = X.copy()
+    newX[newX!=0] = 1
+    newX[newX==0] = 0
+    newy = y.copy()
+    ysets = set(newy.reshape((m, )))
+    yrep = 0
+    for i in ysets:
+        newy[newy==i] = yrep
+        yrep += 1
+    dataSet = np.concatenate((newX, newy), axis=1)
+    igs = [calcInformationGain(dataSet, i) for i in range(n)]
+    dicts = dict(zip(range(n), igs))
+    sortedlist = sorted(dicts.iteritems(), 
+                        key=lambda i: i[1], 
+                        reverse=True)
+    columns = [i for (i, _) in sortedlist]
+    return X[:, columns[:nums]], y, \
+           [labels[int(i)] for i in np.array(sortedlist[:nums])[:, 0]]
+
+#----------------------------------------------------------------------
+def select_features_mul(dirs, nums=1000, filetype='csv'):
+    """
+    使用信息增益选取特征值
+    """
+    cwd = os.getcwd()
+    cwd = cwd + '\\' + dirs
+    files = get_test_files(cwd)
+    X, y, labels = load_file(files, filetype)
+    m, n = np.shape(X)
+    #计算信息熵增益
+    newX = X.copy()
+    newX[newX!=0] = 1
+    newX[newX==0] = 0
+    igs = mutual_info_classif(newX, y.reshape((m, )))
+    dicts = dict(zip(range(n), igs))
+    sortedlist = sorted(dicts.iteritems(), 
+                        key=lambda i: i[1], 
+                        reverse=True)
+    columns = [i for (i, _) in sortedlist]
+    return X[:, columns[:nums]], y, \
+           [labels[int(i)] for i in np.array(sortedlist[:nums])[:, 0]]
+    
 
 #----------------------------------------------------------------------
 def calcTfidf(X, delta=0.0001):
@@ -160,9 +216,11 @@ class BayesTextClsTest(unittest.TestCase):
     #----------------------------------------------------------------------
     def test_load_files(self):
         """"""
+        #import pdb
+        #pdb.set_trace()
         start = datetime.datetime.now()
-        X, y, labels = select_features('test_file2', filetype='txt')
-        #X, y, labels = select_features('test_file1')
+        #X, y, labels = select_features_chi('test_file2', filetype='txt')
+        X, y, labels = select_features_mul('test_file2', filetype='txt')
         m = np.shape(X)[0]
         print u'总样本数：', m
         train_lines = []
